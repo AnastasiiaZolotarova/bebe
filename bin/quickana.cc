@@ -121,23 +121,21 @@ int main()
         Long64_t gcnt = 0, gcntl=0, gcnt1=0, gcnt2 = 0, gcnta = 0, gcnt_rd = 0, sc=0;
         UInt_t otmaxdaq = 1; //what is it?
         FILE * fp = fopen("pulses.dat", "r+");
-        FILE * fn = fopen("noise.dat", "r+");
-        FILE * f_t = fopen("pulse_sample.dat", "r");
+        FILE * f_t = fopen("pulse_sample.dat", "r+");
+        FILE * fn = fopen("noise.dat", "w+");
         size_t ipulse = 0, totpulse = 1, i=0;
         std::ofstream ofs;
         ofs.open ("pappa.dat", std::ofstream::out);
         float model[TIME_WINDOW]; 
         float number;
         size_t ind_mean=0;
-        float fM_h[8877], fM_l_f[8877];
-          while( fscanf(f_t, "%f \n", &number) > 0 ) // parse %d followed by ','
+                 while( fscanf(f_t, "%f \n", &number) > 0 ) // parse %d followed by ','
                 {    
                 model[i]= number; // instead of sum you could put your numbers in an array
                 i++; 
                 }
 
-      // for (size_t i=0; i<TIME_WINDOW; ++i)
-        //fscanf(fp, "%f \n", model[i]);
+     
         
         for (Long64_t ien = 0; ien < nentries; ++ien)
                 {
@@ -169,7 +167,7 @@ int main()
                 // signal analysis
                 h_ped_raw->Fill(p.average(0, 100));
                  float ped_raw = p.average(0,100); 
-              //  p.filter(p.n_samples());
+               //  p.filter(p.n_samples());
                
                 float ped = p.average(0, 100); // simple average 
                 float ped_rms = p.rms(0, 100);
@@ -180,16 +178,11 @@ int main()
                 size_t iM = res.first;                        // index of the max_ampl from the beginning of the window
                 M = res.second; 
                 
-                
-              //  fM_h[totpulse-1] = res.second; 
-                                       // Maximum position.q
-              //  if (totpulse<20) std::cerr << "totpulse: "<< totpulse<< " ampl: "<< fM_h[totpulse-1] <<"\n";
+            
                 float fiM = res.first; // index again?
                  res = p.maximum_fitted(100, p.n_samples()); // maximum defined by fit
                  //
-                fM = res.second; 
-                fM_h[totpulse-1] = res.second; 
-                                       // Maximum position.q
+                fM = res.second;   // Maximum position.q
                // if (totpulse<20) std::cerr << "totpulse: "<< totpulse<< " ampl: "<< fM_h[totpulse-1] <<"\n";
                 float start_index=p.pulse_start(0, p.n_samples());   
                 float SI=p.shape(1024,p.n_samples());
@@ -284,7 +277,7 @@ int main()
                         h_dif->Fill(ft_daq);
                         h_dt->Fill(_e.ts - otmaxdaq);
                 //}
-          //    g_ampl_all_vs_t->SetPoint(gcnta++, ft_daq / 3600., fM);
+             //    g_ampl_all_vs_t->SetPoint(gcnta++, ft_daq / 3600., fM);
                 if (fM > 1e5) h_time_s1->Fill(trise - 0.01 * fM / 1000.);
                 //else if (_e.ampl > 101.2e+3 && _e.ampl < 101.4e+3) g_ampl_vs_decay->SetPoint(gcnt2++, ft_daq / 2000. / 3600., fM);
                // if ( fM<12000){
@@ -298,11 +291,10 @@ int main()
                float Ampl_ref=10000;
                 float p0=9138.3, p1=-0.0452516;
                 float Ampl_stab=fM*Ampl_ref / (p0+p1*ped_raw);
-              // if ( ped_raw<-12000){
+                // if ( ped_raw<-12000){
                 g_baseline_vs_ampl_stab->SetPoint(gcnt1++, ped_raw, Ampl_stab);
-                //}
+               
                //---------------------------------------
-               //if(Ampl_stab<12000 )//&& SI>0.37 && SI<0.39){
                if (Ampl_stab<1000 &&SI<1.45 &&SI>1.37) h_ampl->Fill(Ampl_stab);
 		if(Ampl_stab<12000 ){
                float adc2keV = 4783. / 10468.;
@@ -310,19 +302,15 @@ int main()
                
 
 
-               if (fM > 10000 && fM < 12000 && trise<50)// && SI_int<0.6 && SI_int>0.4) {
-	       // fprintf(stderr, "%ld %f %f\n", gcnt, ft_daq, fM);
-                        g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);
+               if (fM > 10000 && fM < 12000 && trise<50); g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);
 
-               if (fM > 0 && fM < 12000)// && SI_int<0.8 && SI_int>0.2){// && trise>12 && trise<17) {
-	       // fprintf(stderr, "%ld %f %f\n", gcnt, ft_daq, fM);
-                        g_ampl_vs_decay->SetPoint(gcnta++, fM, tdecay);
+               if (fM > 0 && fM < 12000) g_ampl_vs_decay->SetPoint(gcnta++, fM, tdecay);
                       
                 
               //  
-       //  detailed check of pulses if conditions applies
+       //  detailed check of pulses if conditions applies: after filtering
                 if(totpulse<11 ){//fM > 10520 && fM < 10540 && trise>30 && trise<31){
-                        p.filter(p.n_samples());                     
+                        p.filter(p.n_samples());              //wiener filter       
                         ofs << "# pulse number:" << ipulse << "\n";
                         p.inspect(ofs);
                         ofs << "\n\n";
@@ -339,11 +327,11 @@ int main()
                 }
         else
         {
-                             
+          //----------Light signals----------------                    
                 auto res = p.maximum(100, p.n_samples());
                 size_t iM_l = res.first;                        // index of the max_ampl from the beginning of the window
                 float M_l = res.second;    
-              //   fM_l_f[totpulse-1] = res.second;               // Maximum position.q
+             
                 res = p.maximum_fitted(100, p.n_samples()); // maximum defined by fit
                float fM_l = res.second;
                 float fiM_l = res.first; // index again?
@@ -352,7 +340,7 @@ int main()
                 float tdecay_light = p.decay_time_interpolated(iM_l, 0.30, fM_l, fiM_l) - p.decay_time_interpolated(iM_l, 0.90, fM_l, fiM_l);
                 if (tdecay_light<200 && fM_l<5000 && fM_l>0) g_ampl_vs_decay_light->SetPoint(gcntl++, fM_l, tdecay_light);
                 
-              // if (totpulse<20) std::cerr << "ien: "<< totpulse<< " ampl: "<< fM_l_f[totpulse-1] <<"\n";
+            
                 h_ampl_light->Fill(fM_l);
               if (fM<12000 &&fM>0 && fM_l>0 && fM_l<1200)  g_scatter->SetPoint(sc++, fM, fM_l);
                   ++totpulse;
@@ -382,34 +370,7 @@ int main()
         
           std::cerr << "totpulse "<< totpulse <<"\n";
 
-                //-----------------FOURIER TRANSFORM---------------------
-		int n=2048;
-                Double_t *in = new Double_t[2*((n+1)/2+1)];
-                Double_t *in_noise = new Double_t[2*((n+1)/2+1)];
-                Double_t re_2,im_2;
-                for (Int_t i=0; i<n; i++){
-                in[i] = p_average_signal->GetBinContent(i);
-                in_noise[i] = p_average_noise->GetBinContent(i);
-                }
-
-                 Int_t n_size = n+1;
-                
-   		TVirtualFFT *fft_own = TVirtualFFT::FFT(1, &n_size, "R2C ES K");
-  		 //if (!fft_own) return;
-   		fft_own->SetPoints(in);
-   		fft_own->Transform();
-                Double_t *re_full = new Double_t[n];
-                Double_t *im_full = new Double_t[n];
-                fft_own->GetPointsComplex(re_full,im_full); 
-                //fft_own->GetPointComplex(0, re_2, im_2);      
-                  TH1 *hr = 0;
-               hr = TH1::TransformHisto(fft_own, hr, "RE");
-               TH1 *him = 0;
-               him = TH1::TransformHisto(fft_own, him, "IM");
-               // h_fft = TH1::TransformHisto(fft_own, h_fft, "RE");     
-               Double_t *fnoise = new Double_t[n];
-            // */// fnoise=pow(re_full, 2.);
-
+              
         ofs.close();
         if (_e.data) free(_e.data);
       

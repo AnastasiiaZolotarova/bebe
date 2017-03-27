@@ -71,14 +71,14 @@ void bb::pulse::filter(size_t size)
                   FILE * f_nt = fopen("noise_sample.dat", "r");
                   Double_t model[size], noise[size], re_wiener[size], data_fft[size];
                    float number; size_t i=0;
-                while( fscanf(f_t, "%f \n", &number) > 0 ) // parse %d followed by ','
+                while( fscanf(f_t, "%f \n", &number) > 0 ) // loading model and writing data for fft transform
                 {    
-                model[i]= number; data_fft[i]=_data[i]; // instead of sum you could put your numbers in an array
+                model[i]= number; data_fft[i]=_data[i];
                 i++; 
                 } i=0;
-               while( fscanf(f_nt, "%f \n", &number) > 0 ) // parse %d followed by ','
+               while( fscanf(f_nt, "%f \n", &number) > 0 ) 
                {    
-                noise[i]= number; // instead of sum you could put your numbers in an array
+                noise[i]= number; 
                 i++; 
                 }
                 Int_t n_size = size+1;
@@ -104,7 +104,7 @@ void bb::pulse::filter(size_t size)
                 Double_t *re_data = new Double_t[size];
                 Double_t *im_data = new Double_t[size];
                 fft_data->GetPointsComplex(re_data,im_data);
-                for (i=1024; i<size; ++i)
+                for (i=0; i<size; ++i)
                 {
                 re_wiener[i]=(TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i]))/(TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i])+TMath::Abs(re_noise[i]*re_noise[i]+im_noise[i]*im_noise[i]));              
                 re_data[i]=re_wiener[i]*re_data[i];
@@ -119,7 +119,7 @@ void bb::pulse::filter(size_t size)
                 {_data[i]=data_fft[i];}
                                               
               
-  // */    
+     
 }
 
 
