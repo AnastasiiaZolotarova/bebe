@@ -36,8 +36,7 @@ namespace bb {
 
                         // pulse analysis
                         real_t average(size_t start, size_t size);
-                        real_t * sh(size_t start, size_t size);
-                        real_t * average_pulse(size_t start, size_t size, real_t max);
+                        real_t surface(size_t start, size_t size);
                         real_t shape(size_t start, size_t size);
                         real_t shape_adv(size_t start, size_t size, real_t *mode);
                         real_t pulse_start(size_t start, size_t size);

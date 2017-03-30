@@ -67,20 +67,22 @@ void bb::pulse::pre_process(size_t ped_samples)
 
 void bb::pulse::filter(size_t size)
 {
-                  FILE * f_t = fopen("pulse_sample.dat", "r");
-                  FILE * f_nt = fopen("noise_sample.dat", "r");
+                  FILE * f_ms = fopen("pulse_sample.dat", "r");
+                  FILE * f_ns = fopen("noise_sample.dat", "r");
                   Double_t model[size], noise[size], re_wiener[size], data_fft[size];
                    float number; size_t i=0;
-                while( fscanf(f_t, "%f \n", &number) > 0 ) // loading model and writing data for fft transform
+                while( fscanf(f_ms, "%f \n", &number) > 0 ) // loading model and writing data for fft transform
                 {    
                 model[i]= number; data_fft[i]=_data[i];
                 i++; 
                 } i=0;
-               while( fscanf(f_nt, "%f \n", &number) > 0 ) 
+               while( fscanf(f_ns, "%f \n", &number) > 0 ) 
                {    
                 noise[i]= number; 
                 i++; 
                 }
+                fclose(f_ms);
+                fclose(f_ns);
                 Int_t n_size = size+1;
                 
    		TVirtualFFT *fft_model = TVirtualFFT::FFT(1, &n_size, "R2C K");
@@ -133,17 +135,15 @@ bb::real_t bb::pulse::average(size_t start, size_t size)
 }
 
 
-bb::real_t * bb::pulse::average_pulse(size_t start, size_t size, real_t max)
+bb::real_t bb::pulse::surface(size_t start, size_t size)
 {
-        real_t mean_p[size];
-        int counter=0;
+        real_t surface=0;
         for (size_t i = start; i < size; ++i) {
-        mean_p[i] =_data[i]/max;
-        ++counter;
-
+        surface+=_data[i];      
         }
-        return mean_p;
+        return surface;
 }
+
 
 float model(size_t x)
 {
