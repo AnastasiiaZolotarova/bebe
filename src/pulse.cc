@@ -1,5 +1,6 @@
 #include "pulse.h"
-
+#include "TMath.h"
+#include "TComplex.h"
 #include "TF1.h"
 #include "TGraph.h"
 #include "TVirtualFFT.h"
@@ -35,10 +36,10 @@ void bb::pulse::set_data(const daqint_t * data)
 //}
 
 
-void bb::pulse::print_data(std::ostream & os, real_t max)
+void bb::pulse::print_data(std::ostream & os, real_t max, real_t time)
 {
         for (size_t i = 0; i < _nsamples; ++i) {
-              os << _data[i] << " "  "\n";  //os << i << " " << _data[i] << " " << max << "\n";
+              os << _data[i] <<" "<<  "\n";  //os << i << " " << _data[i] << " " << max << "\n";
         }
 }
 
@@ -54,7 +55,7 @@ void bb::pulse::inspect(std::ostream & os)
         os << "#            max: " << p.second << " at " << p.first << "\n";
         p = maximum_fitted(0, _nsamples);
         os << "#     fitted max: " << p.second << " at " << p.first << "\n";
-        print_data(os, p.second);
+        print_data(os, p.second, p.first);
 }
 
 
@@ -65,12 +66,14 @@ void bb::pulse::pre_process(size_t ped_samples)
 }
 
 
-void bb::pulse::filter(size_t size)
+void bb::pulse::filter(size_t size, size_t iM)
 {
                   FILE * f_ms = fopen("pulse_sample.dat", "r");
                   FILE * f_ns = fopen("noise_sample.dat", "r");
                   Double_t model[size], noise[size], re_wiener[size], data_fft[size];
-                   float number; size_t i=0;
+                   float number,freq=992.056, trg=1024; size_t i=0, TIME_WINDOW=2048;
+                TComplex k;
+                TComplex transfer_func[size];
                 while( fscanf(f_ms, "%f \n", &number) > 0 ) // loading model and writing data for fft transform
                 {    
                 model[i]= number; data_fft[i]=_data[i];
@@ -78,12 +81,12 @@ void bb::pulse::filter(size_t size)
                 } i=0;
                while( fscanf(f_ns, "%f \n", &number) > 0 ) 
                {    
-                noise[i]= number; 
+                noise[i]=number; 
                 i++; 
                 }
                 fclose(f_ms);
                 fclose(f_ns);
-                Int_t n_size = size+1;
+                Int_t n_size = size;
                 
    		TVirtualFFT *fft_model = TVirtualFFT::FFT(1, &n_size, "R2C K");
    		fft_model->SetPoints(model);
@@ -106,19 +109,34 @@ void bb::pulse::filter(size_t size)
                 Double_t *re_data = new Double_t[size];
                 Double_t *im_data = new Double_t[size];
                 fft_data->GetPointsComplex(re_data,im_data);
-                for (i=0; i<size; ++i)
+               // WIENER FILTER
+               for (i=0; i<size; ++i)
                 {
                 re_wiener[i]=(TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i]))/(TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i])+TMath::Abs(re_noise[i]*re_noise[i]+im_noise[i]*im_noise[i]));              
-                re_data[i]=re_wiener[i]*re_data[i];
-               
-                               
+                //re_data[i]=re_wiener[i]*re_data[i];
+                //im_data[i]=re_wiener[i]*im_data[i];
+                                             
                 }
+//GATTI MANFREDI FILTER 
+                for (i=0; i<size; ++i)
+                {
+                 k+=TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i])/(re_noise[i]+im_noise[i]);
+                }
+                  for (i=0; i<size; ++i)
+                {
+                transfer_func[i]=(re_model[i]-TComplex::I()*im_model[i])/(re_noise[i]+TComplex::I()*im_noise[i])*exp(-TComplex::I()*(TMath::Pi())*iM*freq);
+                re_data[i]=transfer_func[i]*re_data[i];
+                im_data[i]=transfer_func[i]*im_data[i];
+                                             
+                }
+               // printf("%f, \n", k);
+               // getchar();
                TVirtualFFT *fft_back = TVirtualFFT::FFT(1, &n_size, "C2R K");
                fft_back->SetPointsComplex(re_data,im_data);
                fft_back->Transform();
                fft_back->GetPoints(data_fft);
                 for (i=0; i<size; ++i)
-                {_data[i]=data_fft[i];}
+                {_data[i]=data_fft[i]/size;}
                                               
               
      
@@ -139,12 +157,28 @@ bb::real_t bb::pulse::surface(size_t start, size_t size)
 {
         real_t surface=0;
         for (size_t i = start; i < size; ++i) {
-        surface+=_data[i];      
+       surface+=_data[i];      
         }
         return surface;
 }
+bb::real_t bb::pulse::surface_fitted(size_t start, size_t size, real_t M)
+{
+         real_t surface=0;
+         TGraph * g1 = new TGraph();
+        for (int i = start; i < size; ++i) g1->SetPoint(i, i-start, (real_t)_data[i]);
+  
+        TF1 *myfit = new TF1("myfit","([0]*exp([1]*x)+[2]*exp([3]*x)*[4])", 0, size-start);
+        myfit->SetParameter(0, -1.9);
+        myfit->SetParameter(1, -0.009);
+        myfit->SetParameter(2, 2.77);
+        myfit->SetParameter(3, -0.0016);
+        myfit->SetParameter(4, M);
+        g1->Fit("myfit", "Q", 0, size-start);
+        TF1 * fited = g1->GetFunction("myfit");
+        surface=fited->Integral(0,size-start);
 
-
+        return surface;
+}
 float model(size_t x)
 {
         return (-1.932*exp(-0.008964*x)+2.77*exp(-0.00166*x));
@@ -194,6 +228,19 @@ bb::real_t bb::pulse::rms(size_t start, size_t size)
         }
         m /= (real_t)(size - start);
         return sqrt(mm / (real_t)(size - start) - m * m);
+}
+
+bb::real_t bb::pulse::minimum(size_t start, size_t size)
+{
+        real_t m = 0;
+                for (size_t i = start; i < size; ++i) {
+                //fprintf(stderr, "--> %d %f %f\n", i, m, _data[i]);
+                if (_data[i] < m) {
+                        m = _data[i];
+                                        }
+                //getchar();
+        }
+        return m;
 }
 
 
@@ -269,7 +316,8 @@ bb::real_t bb::pulse::rise_time_interpolated(size_t imax, real_t fraction, real_
         for (size_t i = imax; i >= 0; --i) {
                 if (_data[i] / m <= fraction) {
                         //return imax - i + (m * fraction - _data[i]) / (_data[i + 1] - _data[i]) * 1.;
-                        return tmax - (i + 1 + (_data[i + 1] - m * fraction) / (_data[i + 1] - _data[i]) * 1.);
+                      // return tmax - (i  + (_data[i + 1] - m * fraction) / (_data[i + 1] - _data[i]) * 1.);
+                         return tmax - i + (m * fraction - _data[i] ) / (_data[i + 1] - _data[i]);
                 }
         }
         return -1;
@@ -281,7 +329,7 @@ bb::real_t bb::pulse::decay_time_interpolated(size_t imax, real_t fraction, real
         real_t m = _data[imax];
         if (amplitude) m = amplitude;
         for (size_t i = imax; i < _nsamples; ++i) {
-                if (_data[i] / m < fraction) {
+                if (_data[i] / m <= fraction) {
                         return i - (m * fraction - _data[i]) / (_data[i - 1] - _data[i]) - tmax;
                 }
         }

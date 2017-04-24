@@ -67,8 +67,8 @@ void bb::data_reader::read_streamer_mode_file(const char * input_file_name)
                         detids.push_back(_detid + 1000); // light
                 }
                 if (sscanf(line, "Echantillonage = %lf", &_freq) == 1) {
-                        fprintf(stderr, "# Sampling frequency (kHz): %lf\n", _freq);
-                        _freq *= 1000.;
+                        fprintf(stderr, "# Sampling frequency (Hz): %lf\n", _freq*10);
+                        _freq *= 10.;
                 }
                 if (strcmp(line, "* Donnees\n") == 0) {
                         fprintf(stderr, "# Header parsed.\n");
@@ -107,7 +107,7 @@ void bb::data_reader::read_streamer_mode_file(const char * input_file_name)
                                 _t->Fill();
                         }
                         _time += (Double_t)_nsamples / _freq;
-                }
+                } 
                 data[cnt % _ndetids][(cnt / _ndetids) % _nsamples] = sample;
                 ++cnt;
         }
