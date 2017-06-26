@@ -127,21 +127,25 @@ int main()
         FILE * fp = fopen("pulses.dat", "w+");
         FILE * f_t = fopen("pulse_sample.dat", "r");
         FILE * fn = fopen("noise.dat", "w+");
-        size_t ipulse = 0, totpulse = 1, i=0;
+        size_t ipulse = 0, totpulse = 1, i=0, k=1;
         std::ofstream ofs;
         ofs.open ("pappa.dat", std::ofstream::out);
         float model[TIME_WINDOW];
         float number;
-        size_t ind_mean=0, count=0; Int_t size=2048;
+        size_t ind_mean=0, count=0, is=0; Int_t size=2048;
 
         TVirtualFFT *fft_noise = TVirtualFFT::FFT(1, &size, "R2C K");
+                Double_t for_ttf[size];
    		Double_t *re_noise = new Double_t[size];
                 Double_t *im_noise = new Double_t[size];
                 Double_t *re_noise_temp = new Double_t[size];
                 Double_t *im_noise_temp = new Double_t[size];
                 for (size_t is =0; is < size; ++is)
                  {re_noise[is]=0;
-                  im_noise[is]=0;}
+                  im_noise[is]=0;
+                  re_noise_temp[is]=0;
+                  im_noise_temp[is]=0; 
+		for_ttf[is]=0;}
                  while( fscanf(f_t, "%f \n", &number) > 0 ) // parse %d followed by ','
                 {
                 model[i]= number; // instead of sum you could put your numbers in an array
@@ -159,42 +163,59 @@ int main()
                 // select only one channel
                 if ( _e.detid != 5 && _e.detid != 1005)
                 {  
-                            
-                 p.pre_process(500);
-                 float * data = p.data();
-                 Double_t for_ttf[size];
-                  for (size_t is =0; is < size; ++is)
-                 {for_ttf[is]=data[is];
-                  }
-                 auto res = p.maximum(100, p.n_samples());
-                size_t iM = res.first;                        // index of the max_ampl from the beginning of the window
-                M = res.second;  
-                float Min=p.minimum(100, p.n_samples());
-                 
-                if(count<1000 && ien % 2 == 0 && M<20 && Min>-25){
-                fft_noise->SetPoints(for_ttf);
-   		fft_noise->Transform();
-                fft_noise->GetPointsComplex(re_noise_temp,im_noise_temp);
-                for (size_t is =0; is < size; ++is)
-                 {
-                  re_noise[is]+=re_noise_temp[is];
-                  im_noise[is]+=im_noise_temp[is];
-                 p_average_noise->Fill(is, data[is]);
-                 } ++count;
-               
-                 
-               }
-                for (size_t is =0; is < size; ++is)
-                 {
-                  re_noise[i]=re_noise[i]/count;
-                  im_noise[i]=im_noise[i]/count;
-               }
+                           
                continue;}
                 
                 // in pulse.cc - remove the pedestal
                 if ( ien % 2==0)
                 {
                 // signal analysis
+
+
+
+
+               //=======================COLLECTING NOISE FROM PEDESTALS
+		p.pre_process(500);
+                 float * data = p.data();
+                
+                  
+                 auto res = p.maximum(0, 512);
+                size_t iM = res.first;                        // index of the max_ampl from the beginning of the window
+                M = res.second;  
+                float Min=p.minimum(0,512);
+               // size_t is;                 
+                if(count<1000 && ien % 2 == 0 && M<50 && Min>-50){
+                   
+                if (k>4){k=1;} //if (count<20){ std::cerr << "noise value at 256 "<< k << " "<< 1+size*(k-1)/4 <<"\n";}
+                for(is=(1+size*(k-1)/4); is<=(size*k/4); ++is)
+                 { 
+
+                 //if (count<20){ for (size_t i=0; i<1; ++i) {std::cerr << "is value  "<< is <<"\n";}}
+
+                  for_ttf[is]=data[is-512*(k-1)];
+                //  im_noise[is]+=im_noise_temp[is-512*(k-1)];                
+                 }
+		++count;
+                 ++k;
+  
+              if (k>=4){
+                fft_noise->SetPoints(for_ttf);
+   		fft_noise->Transform();
+                fft_noise->GetPointsComplex(re_noise_temp,im_noise_temp);
+        
+                   for (size_t is =0; is < size; ++is)
+                 {  p_average_noise->Fill(is, for_ttf[is]);
+                             }
+                for (size_t is =0; is < size; ++is)
+                 {
+                  re_noise_temp[i]=+re_noise_temp[i];
+                  im_noise_temp[i]=+im_noise_temp[i];
+               }}
+		
+}
+		//=======================END OF COLLECTION
+
+
                 
                 float ped_raw = p.average(0,100);
                 h_ped_raw->Fill(ped_raw);
@@ -203,8 +224,8 @@ int main()
                 float ped_rms = p.rms(0, 100);
                 h_ped->Fill(ped);
                 h_ped_rms->Fill(ped_rms);
-                auto res = p.maximum(100, p.n_samples());
-                size_t iM = res.first;                        // index of the max_ampl from the beginning of the window
+                res = p.maximum(100, p.n_samples());
+                iM = res.first;                        // index of the max_ampl from the beginning of the window
                 M = res.second;
                 res = p.maximum_fitted(100, p.n_samples()); // maximum defined by fit
                 float fiM = res.first; // index again?
@@ -215,7 +236,7 @@ int main()
                 float SI=p.shape(1024,p.n_samples());
                 float ft_daq = _e.ts + fiM; // in seconds
                 //trying to use pulses with good SI for new mean pulse:
-                 float * data = p.data();
+                 data = p.data();
                  float * mean;
                          // pause until Enter key pressed
                     //   std::cerr << "ien" << ien << " amplitude " << fM << " dumped, press [Enter] to continue...\n";
@@ -348,6 +369,10 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
 
               if (fM > 0 && fM < 12000) g_ampl_vs_decay->SetPoint(gcnta++, fM, tdecay);
 
+
+
+//--------------------COMMENTED: write to file the pulse after fillter
+
        //  detailed check of pulses if conditions applies: after filtering
                 if( ipulse<10 && SI<1.4 && SI>1.36 && fM>10200 && fM<10700 && trise>32 && trise<33){
                         p.filter(p.n_samples(),iM);              //wiener filter
@@ -362,6 +387,7 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
 
                         continue; // do not perform the rest of the analysis
                               }
+
 
               }
         else
@@ -394,17 +420,17 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
           for (size_t o = 0; o < TIME_WINDOW; ++o)
                 {
          model1=p_average_signal->GetBinContent(o);
-        fprintf(fp,"%f \n", model1); 
-         re_noise[o]=re_noise[o]/count;
-         im_noise[o]=im_noise[o]/count;}
+        fprintf(fp,"%f \n", model1); }
+        // re_noise[o]=re_noise[o]/count;
+         //im_noise[o]=im_noise[o]/count;}
 
           TVirtualFFT *fft_back = TVirtualFFT::FFT(1, &size, "C2R K");
-               fft_back->SetPointsComplex(re_noise,im_noise);
+               fft_back->SetPointsComplex(re_noise_temp,im_noise_temp);
                fft_back->Transform();
                fft_back->GetPoints(data_fft); 
           for (size_t o = 0; o < size; ++o)
                 {
-         model1=data_fft[o]/size;
+         model1=data_fft[o]/count;
         fprintf(fn,"%f \n", model1); }
 
           std::cerr << "totpulse "<< totpulse <<"\n";
