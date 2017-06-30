@@ -48,7 +48,7 @@ int main()
 {
         TFile * fout = TFile::Open("histos.root", "recreate");
         TProfile * p_average_noise= new TProfile("p_average_noise","p_average_noise", TIME_WINDOW, 0., TIME_WINDOW);
-        TH1F     * h_ampl_heat               = new TH1F("h_ampl_heat", "h_ampl_heat", 1000, -5, 5);
+        TH1F     * h_ampl_heat               = new TH1F("h_ampl_heat", "h_ampl_heat", 1000, 0, 20000);
         TH1F     * h_ampl_light             = (TH1F*)h_ampl_heat->Clone("h_ampl_light");
         TH1F     * h_ampl_res               = new TH1F("h_ampl_res", "h_ampl_res", 1000, -10., 10.);
         TH1F     * h_ped_rms                = new TH1F("h_ped_rms", "h_ped_rms", 100, 0., 100.);
@@ -58,7 +58,7 @@ int main()
         gDirectory->Add(g_baseline_vs_ampl);
 
           TGraph * g_baseline_vs_time            = new TGraph();
-        g_baseline_vs_ampl->SetNameTitle("g_baseline_vs_time", "g_baseline_vs_time");
+        g_baseline_vs_time->SetNameTitle("g_baseline_vs_time", "g_baseline_vs_time");
         gDirectory->Add(g_baseline_vs_time);
 
          TGraph * g_scatter            = new TGraph();
@@ -76,11 +76,11 @@ int main()
         UInt_t otmaxdaq = 1; //what is it?
         FILE * fn = fopen("noise.dat", "w+");
         size_t ipulse = 0, totpulse = 1, i=0, k=1;
-        Long64_t sc=0, gcnt1=0;
+        Long64_t sc=0, gcnt1=0,gcnt2=0;
         std::ofstream ofs;
         ofs.open ("pappa.dat", std::ofstream::out);     
         size_t ind_mean=0, count=0, is=0; Int_t size=2048;
-        float M, fM;
+        
         TVirtualFFT *fft_noise = TVirtualFFT::FFT(1, &size, "R2C K");
                 Double_t for_ttf[size];
    		Double_t *re_noise = new Double_t[size];
@@ -101,7 +101,7 @@ int main()
                  bb::pulse p(_e.nsamples);
                 p.set_data(_e.data);
                 
-                 
+                 float fM;
                 // select only one channel
                 if ( _e.detid != 5 && _e.detid != 1005) continue;
                 
@@ -118,7 +118,7 @@ int main()
                   
                  auto res = p.maximum(0, 512);
                 size_t iM = res.first;                        // index of the max_ampl from the beginning of the window
-                M = res.second;  
+              float  M = res.second;  
                 float Min=p.minimum(0,512);
                // size_t is;                 
                 if(count<1000 && ien % 2 == 0 && M<20 && Min>-20)
@@ -157,16 +157,16 @@ int main()
                 res = p.maximum_fitted(100, p.n_samples()); // maximum defined by fit
                 float fiM = res.first; // index again?
                 fM = res.second;   // Maximum position.q
-                h_ampl_heat->Fill(fM);
+               if(fM<20000 && fM>0) h_ampl_heat->Fill(M);
                  float ft_daq = _e.ts + fiM; // in seconds
                 
                //------------------------------------------------------------
                 h_ampl_res->Fill((fM - M) / fM);
-              //  h_dt->Fill(_e.ts - otmaxdaq);
-             
+              
+              if (fM>0 && fM<20000){
                 g_baseline_vs_ampl->SetPoint(gcnt1++, ped_raw, fM);
                 
-                 g_baseline_vs_time->SetPoint(gcnt1++, _e.ts - otmaxdaq, fM);
+                 g_baseline_vs_time->SetPoint(gcnt2++, _e.ts - otmaxdaq, ped_raw);}
                 
                          ++ipulse; 
 
