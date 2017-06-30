@@ -30,25 +30,14 @@ namespace bb {
 
                         void pre_process(size_t ped_samples);
                     
-                        void filter(size_t size, size_t iM);
-
                         size_t n_samples() { return _nsamples; };
 
                         // pulse analysis
                         real_t average(size_t start, size_t size);
-                        real_t surface(size_t start, size_t size);
-                        real_t surface_fitted(size_t start, size_t size, real_t M);
-                        real_t shape(size_t start, size_t size);
-                        real_t shape_adv(size_t start, size_t size, real_t *mode);
-                        real_t pulse_start(size_t start, size_t size);
                         real_t rms(size_t start, size_t size);
                         real_t minimum(size_t start, size_t size);
                         std::pair<real_t, real_t> maximum(size_t start, size_t size);
                         std::pair<real_t, real_t> maximum_fitted(size_t start, size_t size);
-                        real_t decay_time(size_t imax, real_t fraction);
-                        real_t rise_time(size_t imax, real_t fraction);
-                        real_t rise_time_interpolated(size_t imax, real_t fraction, real_t amplitude, real_t tmax);
-                        real_t decay_time_interpolated(size_t imax, real_t fraction, real_t amplitude, real_t tmax);
 
 
                 private:
