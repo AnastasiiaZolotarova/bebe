@@ -180,9 +180,8 @@ int main()
                    for (size_t is =1; is < p.n_samples()-1; ++is)
                 { 
                 chi_square+=(data[is]/M-model[is])*(data[is]/M-model[is])/(model[is]);
-                //if (totpulse<2) std::cerr << "chi square: "<< chi_square <<"\n";
                 }
-              // std::cerr << "chi square: "<< chi_square <<"\n";
+            
                 if(chi_square<1.2 && chi_square>0.8) {
                 for (size_t is =0; is < p.n_samples(); ++is)
                 {
@@ -201,8 +200,7 @@ int main()
                          ++ipulse; 
 
                         //continue; // do not perform the rest of the analysis
-                              
-
+                             
 
               }
         else
