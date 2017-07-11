@@ -110,7 +110,7 @@ int main()
                 {
                 // signal analysis
 
-               //=======================COLLECTING NOISE FROM PEDESTALS
+               //=======================COLLECTING NOISE FROM PEDESTALS--------------------------
                 float ped_raw = p.average(0,200);
                 p.pre_process(500);
                  float * data = p.data();
@@ -146,7 +146,7 @@ int main()
                  }
 		}
            }
-		//=======================END OF COLLECTION
+		//=======================END OF COLLECTION-----------------------------
 
                 float ped = p.average(0, 100); // simple average
                 float ped_rms = p.rms(0, 100);
