@@ -184,7 +184,7 @@ int main()
                 M = res.second;  
                 float Min=p.minimum(0,512);
                // size_t is;                 
-                if(count<1000 && ien % 2 == 0 && M<50 && Min>-50){
+                if(count<1000 && ien % 2 == 0 && M<20 && Min>-20){
                    
                 if (k>4){k=1;} //if (count<20){ std::cerr << "noise value at 256 "<< k << " "<< 1+size*(k-1)/4 <<"\n";}
                 for(is=(1+size*(k-1)/4); is<=(size*k/4); ++is)
@@ -232,7 +232,7 @@ int main()
                 fM = res.second;   // Maximum position.q
                 float start_index=p.pulse_start(0, p.n_samples());
                 float P_surf=p.surface(1024, 1800);
-                h_ampl_raw->Fill(P_surf);
+                h_ampl_raw->Fill(M);
                 float SI=p.shape(1024,p.n_samples());
                 float ft_daq = _e.ts + fiM; // in seconds
                 //trying to use pulses with good SI for new mean pulse:
@@ -241,6 +241,26 @@ int main()
                          // pause until Enter key pressed
                     //   std::cerr << "ien" << ien << " amplitude " << fM << " dumped, press [Enter] to continue...\n";
                         //getchar(); // uncomment if you want to pause
+                
+//-------------------AVERAGE PULSE COLLECTING USING CHI-SQUARE-------------------
+                float chi_square=0;
+                   for (size_t is =1; is < p.n_samples()-1; ++is)
+                { 
+                chi_square+=(data[is]/M-model[is])*(data[is]/M-model[is])/(model[is]);
+                //if (totpulse<2) std::cerr << "chi square: "<< chi_square <<"\n";
+                }
+              // std::cerr << "chi square: "<< chi_square <<"\n";
+                if(chi_square<1.2 && chi_square>0.8) {
+                for (size_t is =0; is < p.n_samples(); ++is)
+                {
+                p_average_signal->Fill(is, data[is]/M);
+                }
+                ind_mean++;
+                } 
+//-------------------END OF COLLECTION-------------------------------------------
+
+
+/* //--------------------old stuff
                 if (SI<1.405 && SI>1.395 && fM>5000 && fM<8000 )
                 {
                  // p.pre_process(1000);
@@ -251,7 +271,7 @@ int main()
                 }
                 ind_mean++;
                 }
-
+*/
 
 
                  
@@ -326,13 +346,13 @@ int main()
                         h_dif->Fill(ft_daq);
                         h_dt->Fill(_e.ts - otmaxdaq);
                 //}
-             //    g_ampl_all_vs_t->SetPoint(gcnta++, ft_daq / 3600., fM);
+               //  g_ampl_all_vs_t->SetPoint(gcnta++, ft_daq / 3600., fM);
                 if (fM > 1e5) h_time_s1->Fill(trise - 0.01 * fM / 1000.);
                 //else if (_e.ampl > 101.2e+3 && _e.ampl < 101.4e+3) g_ampl_vs_decay->SetPoint(gcnt2++, ft_daq / 2000. / 3600., fM);
-                if ( fM<12000 && fM>0 && ped_raw<-10000 && ped_raw>-30000){
+                if ( fM<12000 && fM>0 ){//&& ped_raw<-10000 && ped_raw>-30000){
                 g_baseline_vs_ampl->SetPoint(gcnt1++, ped_raw, fM);}
                 
-
+               
                //-----------work with pulse area data-----------
                /* if (fM<12000 && fM>0 && SI<1.5 && SI>1.3 && P_surf>0 && P_surf<2700000){
                 g_ampl_vs_decay->SetPoint(gcnta++, P_surf/100, fM);
@@ -356,7 +376,7 @@ int main()
                  if (fM<12000 && fM>0 && ped_raw<-10000 && ped_raw>-30000){
                 g_baseline_vs_ampl_stab->SetPoint(gcnt1++, ped_raw, Ampl_stab);}
                //---------------------------------------
-               //if (Ampl_stab<12000 &&SI<1.45 &&SI>1.37) h_ampl->Fill(Ampl_stab);
+               if (Ampl_stab<12000 &&SI<1.8 &&SI>1.1) h_ampl->Fill(Ampl_stab);
                 float adc2keV = 4783. / 10468.;
 		if(Ampl_stab<12000 ){
                
@@ -375,7 +395,7 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
 
        //  detailed check of pulses if conditions applies: after filtering
                 if( ipulse<10 && SI<1.4 && SI>1.36 && fM>10200 && fM<10700 && trise>32 && trise<33){
-                        p.filter(p.n_samples(),iM);              //wiener filter
+                        p.filter(p.n_samples(),iM,M);              //wiener filter
                         ofs << "# pulse number:" << ipulse << "\n";
                         p.inspect(ofs);
                         ofs << "\n\n";

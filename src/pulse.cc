@@ -66,14 +66,14 @@ void bb::pulse::pre_process(size_t ped_samples)
 }
 
 
-void bb::pulse::filter(size_t size, size_t iM)
+void bb::pulse::filter(size_t size, size_t iM, real_t M)
 {
                   FILE * f_ms = fopen("pulse_sample.dat", "r");
                   FILE * f_ns = fopen("noise_sample.dat", "r");
                   Double_t model[size], noise[size], re_wiener[size], data_fft[size];
-                   float number,freq=992.056, trg=1024; size_t i=0, TIME_WINDOW=2048;
+                   float number,freq=992.056, trg=1024; size_t i=0,s=0, TIME_WINDOW=2048;
                 TComplex k=0;
-                TComplex transfer_func[size], c_model[size], c_noise[size], c_data[size];
+                TComplex transfer_func[size], c_wiener[size], c_model[size], c_noise[size], c_data[size];
                 while( fscanf(f_ms, "%f \n", &number) > 0 ) // loading model and writing data for fft transform
                 {    
                 model[i]= number; data_fft[i]=_data[i];
@@ -83,7 +83,7 @@ void bb::pulse::filter(size_t size, size_t iM)
                {    
                 noise[i]=number; 
                 i++; 
-                }
+                } 
                 fclose(f_ms);
                 fclose(f_ns);
                 Int_t n_size = size;
@@ -94,8 +94,8 @@ void bb::pulse::filter(size_t size, size_t iM)
                 Double_t *re_model = new Double_t[size];
                 Double_t *im_model = new Double_t[size];
                 fft_model->GetPointsComplex(re_model,im_model);
-		for (size_t s = 0; s < size; ++s) { c_model[s] = TComplex(re_model[s], im_model[s]); } 
-      
+		for (s = 0; s < size; ++s) { c_model[s] = TComplex(re_model[s], im_model[s]); } 
+                //std::cerr << "s value  "<< s <<"\n";
                   
    		TVirtualFFT *fft_noise = TVirtualFFT::FFT(1, &n_size, "R2C K");
    		fft_noise->SetPoints(noise);
@@ -103,7 +103,7 @@ void bb::pulse::filter(size_t size, size_t iM)
                 Double_t *re_noise = new Double_t[size];
                 Double_t *im_noise = new Double_t[size];
                 fft_noise->GetPointsComplex(re_noise,im_noise);
-		for (size_t s = 0; s < size; ++s) { c_noise[s] = TComplex(re_noise[s], im_noise[s]); } 
+		for (s = 0; s < size; ++s) { c_noise[s] = TComplex(re_noise[s], im_noise[s]); } 
    
    		TVirtualFFT *fft_data = TVirtualFFT::FFT(1, &n_size, "R2C K");
    		fft_data->SetPoints(data_fft);
@@ -111,12 +111,12 @@ void bb::pulse::filter(size_t size, size_t iM)
                 Double_t *re_data = new Double_t[size];
                 Double_t *im_data = new Double_t[size];
                 fft_data->GetPointsComplex(re_data,im_data);
-		for (size_t s = 0; s < size; ++s) { c_data[s] = TComplex(re_data[s], im_data[s]); } 
+		for (s = 0; s < size; ++s) { c_data[s] = TComplex(re_data[s], im_data[s]); } 
 
                // WIENER FILTER
                for (i=0; i<size; ++i)
                 {
-                re_wiener[i]=(TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i]))/(TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i])+TMath::Abs(re_noise[i]*re_noise[i]+im_noise[i]*im_noise[i]));              
+                c_wiener[i]=(TComplex::Abs(c_model[i])*TComplex::Abs(c_model[i])) / ((TComplex::Abs(c_model[i])*TComplex::Abs(c_model[i])) + (TComplex::Abs(c_noise[i])*TComplex::Abs(c_noise[i])));              
               //  re_data[i]=re_wiener[i]*re_data[i];
                // im_data[i]=re_wiener[i]*im_data[i];
                                              
@@ -125,17 +125,18 @@ void bb::pulse::filter(size_t size, size_t iM)
                 for (i=0; i<size; ++i)
                 {
               //   k+=TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i])/(re_noise[i]+im_noise[i]);
-                      k+=TComplex::Abs(c_model[i])/(c_noise[i]);
-                }
+                      k+=(TComplex::Abs(c_model[i]))*(TComplex::Abs(c_model[i]))/(c_noise[i]);
+                      //if (i>1023 && i<1026){std::cerr << "k re value  "<< c_noise[i].Im() <<"\n";}
+                } 
                   for (i=0; i<size; ++i)
                 {
                 //transfer_func[i]=(re_model[i]-TComplex::I()*im_model[i])/(re_noise[i]+TComplex::I()*im_noise[i])*exp(-TComplex::I()*(TMath::Pi())*iM*freq);
 
-                transfer_func[i]=k*((TComplex::Conjugate(c_model[i]))/(c_noise[i])*exp(-TComplex::I()*(TMath::Pi())*iM*freq));
-                c_data[i]=transfer_func[i]*c_data[i];
+                transfer_func[i]=size*((TComplex::Conjugate(c_model[i]))/(c_noise[i])*exp(-TComplex::I()*2*(TMath::Pi())*iM*size));
+                c_data[i]=transfer_func[i]*c_data[i];//c_wiener[i]*c_data[i];//
                 //re_data[i]=transfer_func[i]*re_data[i];
                 //im_data[i]=transfer_func[i]*im_data[i];
-
+                  
                for (size_t s = 0; s < size; ++s) { 
                
                 re_data[s]=c_data[s].Re();

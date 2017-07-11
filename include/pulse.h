@@ -30,7 +30,7 @@ namespace bb {
 
                         void pre_process(size_t ped_samples);
                     
-                        void filter(size_t size, size_t iM);
+                        void filter(size_t size, size_t iM, real_t M);
 
                         size_t n_samples() { return _nsamples; };
 
