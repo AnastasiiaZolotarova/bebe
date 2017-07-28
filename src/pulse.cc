@@ -70,23 +70,44 @@ void bb::pulse::filter(size_t size, size_t iM, real_t M)
 {
                   FILE * f_ms = fopen("pulse_sample.dat", "r");
                   FILE * f_ns = fopen("noise_sample.dat", "r");
-                  Double_t model[size], noise[size], re_wiener[size], data_fft[size];
-                   float number,freq=992.056, trg=1024; size_t i=0,s=0, TIME_WINDOW=2048;
-                TComplex k=0;
-                TComplex transfer_func[size], c_wiener[size], c_model[size], c_noise[size], c_data[size];
+                  FILE * f_win = fopen("tukey.dat", "r");
+                  FILE * f_ham = fopen("hamming.dat", "r");
+                  Double_t model[size]={0}, model_win[size]={0}, noise[size]={0}, re_wiener[size]={0}, data_fft[size*2]={0},win[size]={0}, ham[size]={0},tranf[size]={0},trans_mod[size*2]={0};
+                   float number=0,freq=992.056; size_t i=0, s=0;
+                TComplex c_noise[size]=0, k=0, transfer_func[size]=0, c_tf_mod[size*2]=0,c_wiener[size]=0, c_model[size]=0, c_model_win[size]=0;
+                TComplex c_data[size*2]=0;
+                 while( fscanf(f_win, "%f \n", &number) > 0 ) 
+               {    
+                win[i]=number; 
+                 
+                 i++;
+                } i=0;number=0;
+                while( fscanf(f_ham, "%f \n", &number) > 0 ) 
+               {    
+                ham[i]=number; 
+                i++; 
+                } i=0;number=0; 
                 while( fscanf(f_ms, "%f \n", &number) > 0 ) // loading model and writing data for fft transform
                 {    
-                model[i]= number; data_fft[i]=_data[i];
+                model[i]= number; 
                 i++; 
-                } i=0;
+                } i=0;number=0;
                while( fscanf(f_ns, "%f \n", &number) > 0 ) 
                {    
                 noise[i]=number; 
+                //model[i]=model[i];
                 i++; 
                 } 
+                for (i=0; i<size*2; ++i)              
+                {
+                if(i>=size/2 && i<size*2-size/2) {data_fft[i]=_data[i-size/2]*win[i-size/2];}// if (i>1020 && i<1023){std::cerr << "data value  "<< win[i]<<" number: "<< i <<"\n";}
+                else data_fft[i]=0;
+                }
                 fclose(f_ms);
                 fclose(f_ns);
-                Int_t n_size = size;
+                fclose(f_win);
+                fclose(f_ham);
+                Int_t n_size = size, n_size2 = size*2;
                 
    		TVirtualFFT *fft_model = TVirtualFFT::FFT(1, &n_size, "R2C K");
    		fft_model->SetPoints(model);
@@ -94,8 +115,7 @@ void bb::pulse::filter(size_t size, size_t iM, real_t M)
                 Double_t *re_model = new Double_t[size];
                 Double_t *im_model = new Double_t[size];
                 fft_model->GetPointsComplex(re_model,im_model);
-		for (s = 0; s < size; ++s) { c_model[s] = TComplex(re_model[s], im_model[s]); } 
-                //std::cerr << "s value  "<< s <<"\n";
+		for (s = 0; s < size; ++s) { c_model[s] = TComplex(re_model[s], im_model[s]); model_win[s]=model[s]*win[s]; }//noise[s]=noise[s]*ham[s];}
                   
    		TVirtualFFT *fft_noise = TVirtualFFT::FFT(1, &n_size, "R2C K");
    		fft_noise->SetPoints(noise);
@@ -105,54 +125,90 @@ void bb::pulse::filter(size_t size, size_t iM, real_t M)
                 fft_noise->GetPointsComplex(re_noise,im_noise);
 		for (s = 0; s < size; ++s) { c_noise[s] = TComplex(re_noise[s], im_noise[s]); } 
    
-   		TVirtualFFT *fft_data = TVirtualFFT::FFT(1, &n_size, "R2C K");
+   		TVirtualFFT *fft_data = TVirtualFFT::FFT(1, &n_size2, "R2C K");
    		fft_data->SetPoints(data_fft);
    		fft_data->Transform();
-                Double_t *re_data = new Double_t[size];
-                Double_t *im_data = new Double_t[size];
+                Double_t *re_data = new Double_t[size*2];
+                Double_t *im_data = new Double_t[size*2];
                 fft_data->GetPointsComplex(re_data,im_data);
-		for (s = 0; s < size; ++s) { c_data[s] = TComplex(re_data[s], im_data[s]); } 
+		for (s = 0; s < size*2; ++s) { c_data[s] = TComplex(re_data[s], im_data[s]); } 
 
+
+                TVirtualFFT *fft_model_win = TVirtualFFT::FFT(1, &n_size, "R2C K");
+   		fft_model_win->SetPoints(model_win);
+   		fft_model_win->Transform();
+                Double_t *re_model_win = new Double_t[size];
+                Double_t *im_model_win = new Double_t[size];
+                Double_t *re_tr = new Double_t[size];
+                Double_t *im_tr = new Double_t[size];
+                fft_model_win->GetPointsComplex(re_model_win,im_model_win);
+		for (s = 0; s < size; ++s) { c_model_win[s] = TComplex(re_model_win[s], im_model_win[s]); } 
                // WIENER FILTER
                for (i=0; i<size; ++i)
                 {
-                c_wiener[i]=(TComplex::Abs(c_model[i])*TComplex::Abs(c_model[i])) / ((TComplex::Abs(c_model[i])*TComplex::Abs(c_model[i])) + (TComplex::Abs(c_noise[i])*TComplex::Abs(c_noise[i])));              
+                c_wiener[i]=(TComplex::Abs(c_model[i])*TComplex::Abs(c_model[i]))/((TComplex::Abs(c_model[i])*TComplex::Abs(c_model[i])) + (TComplex::Abs(c_noise[i])*TComplex::Abs(c_noise[i])));              
               //  re_data[i]=re_wiener[i]*re_data[i];
                // im_data[i]=re_wiener[i]*im_data[i];
                                              
                 }
 //GATTI MANFREDI FILTER 
-                for (i=0; i<size; ++i)
+                 k=0;
+                for (i=0; i<size/2; ++i)
                 {
-              //   k+=TMath::Abs(re_model[i]*re_model[i]+im_model[i]*im_model[i])/(re_noise[i]+im_noise[i]);
-                      k+=(TComplex::Abs(c_model[i]))*(TComplex::Abs(c_model[i]))/(c_noise[i]);
-                      //if (i>1023 && i<1026){std::cerr << "k re value  "<< c_noise[i].Im() <<"\n";}
-                } 
+              
+                   k+=(TComplex::Abs(c_model_win[i]))*(TComplex::Abs(c_model_win[i]))/(c_noise[i])/size; ////
+                   //   if (i>1023 && i<1026){std::cerr << "k re value  "<< c_noise[i].Re() <<"\n";}
+                } k=1/(k); 
+                 std::cerr << "k re value  "<< k <<"\n";
                   for (i=0; i<size; ++i)
                 {
-                //transfer_func[i]=(re_model[i]-TComplex::I()*im_model[i])/(re_noise[i]+TComplex::I()*im_noise[i])*exp(-TComplex::I()*(TMath::Pi())*iM*freq);
-
-                transfer_func[i]=size*((TComplex::Conjugate(c_model[i]))/(c_noise[i])*exp(-TComplex::I()*2*(TMath::Pi())*iM*size));
-                c_data[i]=transfer_func[i]*c_data[i];//c_wiener[i]*c_data[i];//
-                //re_data[i]=transfer_func[i]*re_data[i];
-                //im_data[i]=transfer_func[i]*im_data[i];
-                  
+                transfer_func[i]=k*(TComplex::Abs(TComplex::Conjugate(c_model[i]))/(c_noise[i])*exp(-TComplex::I()*2*(TMath::Pi())*iM*i/size*freq));
+                 }                
                for (size_t s = 0; s < size; ++s) { 
                
-                re_data[s]=c_data[s].Re();
-                im_data[s]=c_data[s].Im();
+                re_tr[s]=transfer_func[s].Re();
+                im_tr[s]=transfer_func[s].Im();
   
                  }  
-                //transfer_func                             
+                
+               TVirtualFFT *fft_back_transf = TVirtualFFT::FFT(1, &n_size, "C2R K");
+               fft_back_transf->SetPointsComplex(re_tr,im_tr);
+               fft_back_transf->Transform();
+               fft_back_transf->GetPoints(tranf);                          
+                
+                 //int n=size/2;
+
+                for (i=0; i<size*2; ++i)
+                
+                {
+                if(i>=0 && i<size/2) {trans_mod[i]=win[i+size/2]*tranf[i];} else {trans_mod[i]=0;}
+                if(i>=size/2 && i<size*3/2) {trans_mod[i]=0;}
+                if(i>=size*3/2 && i<size*2) {trans_mod[i]=win[i-size*3/2]*tranf[i-size];}
+                // if (i>1020 && i<1030){
+               // std::cerr << "data value  "<< trans_mod[i]<<" number: "<< i <<"\n";//}
+                 }
+                TVirtualFFT *fft_transf = TVirtualFFT::FFT(1, &n_size2, "R2C K");
+   		fft_transf->SetPoints(trans_mod);
+   		fft_transf->Transform();
+                Double_t *re_tm = new Double_t[size*2];
+                Double_t *im_tm = new Double_t[size*2];
+                fft_transf->GetPointsComplex(re_tm,im_tm);
+		for (s = 0; s < size*2; ++s) { c_tf_mod[s] = TComplex(re_tm[s], im_tm[s]); }                 
+
+                for (i=0; i<size*2; ++i)
+                {c_data[i]=c_tf_mod[i]*c_data[i];
+                //re_data[i]=c_data[i].Re()*c_tf_mod[i].Re()-c_data[i].Im()*c_tf_mod[i].Im();
+                //im_data[i]=c_data[i].Re()*c_tf_mod[i].Im()+c_data[i].Im()*c_tf_mod[i].Re();
+                
                 }
                // printf("%f, \n", k);
                // getchar();
-               TVirtualFFT *fft_back = TVirtualFFT::FFT(1, &n_size, "C2R K");
+               TVirtualFFT *fft_back = TVirtualFFT::FFT(1, &n_size2, "C2R K");
                fft_back->SetPointsComplex(re_data,im_data);
                fft_back->Transform();
                fft_back->GetPoints(data_fft);
-                for (i=0; i<size; ++i)
-                {_data[i]=data_fft[i]/size;}
+                for (i=size/2; i<size*3/2; ++i)
+                {_data[i-size/2]=data_fft[i]/size/2;}
                                               
               
      

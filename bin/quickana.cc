@@ -394,7 +394,7 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
 //--------------------COMMENTED: write to file the pulse after fillter
 
        //  detailed check of pulses if conditions applies: after filtering
-                if( ipulse<10 && SI<1.4 && SI>1.36 && fM>10200 && fM<10700 && trise>32 && trise<33){
+                if( ipulse<7 && SI<1.4 && SI>1.36 && fM>10200 && fM<10700 && trise>32 && trise<33){
                         p.filter(p.n_samples(),iM,M);              //wiener filter
                         ofs << "# pulse number:" << ipulse << "\n";
                         p.inspect(ofs);
