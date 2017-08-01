@@ -47,6 +47,7 @@ void set_branches(TTree * t)
 int main()
 {
         TFile * fout = TFile::Open("histos.root", "recreate");
+        TProfile * p_average_signal= new TProfile("p_average_signal","p_average_signal", TIME_WINDOW, 0., TIME_WINDOW);
         TProfile * p_average_noise= new TProfile("p_average_noise","p_average_noise", TIME_WINDOW, 0., TIME_WINDOW);
         TH1F     * h_ampl_heat               = new TH1F("h_ampl_heat", "h_ampl_heat", 1000, 0, 20000);
         TH1F     * h_ampl_light             = (TH1F*)h_ampl_heat->Clone("h_ampl_light");
@@ -65,6 +66,10 @@ int main()
         g_scatter->SetNameTitle("g_scatter", "g_scatter");
         gDirectory->Add(g_scatter);
 
+        TGraph * g_noise            = new TGraph();
+        g_noise->SetNameTitle("g_noise", "g_noise");
+        gDirectory->Add(g_noise);
+
        // creation of an output is done
 
         TFile * fin = TFile::Open("lsm_with_light.root");
@@ -75,12 +80,14 @@ int main()
         Long64_t nentries = t->GetEntries(); //get amount of samples
         UInt_t otmaxdaq = 1; //what is it?
         FILE * fn = fopen("noise.dat", "w+");
+        FILE * f_t = fopen("pulse_sample.dat", "r");
         size_t ipulse = 0, totpulse = 1, i=0, k=1;
         Long64_t sc=0, gcnt1=0,gcnt2=0;
         std::ofstream ofs;
         ofs.open ("pappa.dat", std::ofstream::out);     
         size_t ind_mean=0, count=0, is=0; Int_t size=2048;
-        
+        float model[TIME_WINDOW];
+        float number;
         TVirtualFFT *fft_noise = TVirtualFFT::FFT(1, &size, "R2C K");
                 Double_t for_ttf[size];
    		Double_t *re_noise = new Double_t[size];
@@ -111,6 +118,14 @@ int main()
                 // signal analysis
 
                //=======================COLLECTING NOISE FROM PEDESTALS--------------------------
+
+                   while( fscanf(f_t, "%f \n", &number) > 0 ) // parse %d followed by ','
+                {
+                model[i]= number; // instead of sum you could put your numbers in an array
+                i++;
+                }
+               //=======================COLLECTING NOISE FROM PEDESTALS
+
                 float ped_raw = p.average(0,200);
                 p.pre_process(500);
                  float * data = p.data();
@@ -162,6 +177,24 @@ int main()
                 
                //------------------------------------------------------------
                 h_ampl_res->Fill((fM - M) / fM);
+
+
+//-------------------AVERAGE PULSE COLLECTING USING CHI-SQUARE-------------------
+                float chi_square=0;
+                   for (size_t is =1; is < p.n_samples()-1; ++is)
+                { 
+                chi_square+=(data[is]/M-model[is])*(data[is]/M-model[is])/(model[is]);
+                }
+            
+                if(chi_square<1.2 && chi_square>0.8) {
+                for (size_t is =0; is < p.n_samples(); ++is)
+                {
+                p_average_signal->Fill(is, data[is]/M);
+                }
+                ind_mean++;
+                } 
+//-------------------END OF COLLECTION-------------------------------------------
+                //if (chi_square<200000 && chi_square>-200000) h_ampl_res->Fill(chi_square);
               
               if (fM>0 && fM<20000){
                 g_baseline_vs_ampl->SetPoint(gcnt1++, ped_raw, fM);
@@ -171,8 +204,7 @@ int main()
                          ++ipulse; 
 
                         //continue; // do not perform the rest of the analysis
-                              
-
+                             
 
               }
         else
@@ -193,14 +225,18 @@ int main()
         }
     
         }
+ for (size_t p=1; p<1024; ++p)
+ g_noise->SetPoint(p, log10(p), log10(sqrt(re_noise_temp[p]*re_noise_temp[p]+im_noise_temp[p]*im_noise_temp[p])/sqrt(p)));
           std::cerr << "totpulse "<< totpulse <<"\n";
 
         ofs.close();
         if (_e.data) free(_e.data);      
  std::cerr << "noise collection: "<< count <<"\n";
+ std::cerr << "mean collection: "<< ind_mean <<"\n";
         fout->Write();
         fout->Close();
         fclose(fn);
+        fclose(f_t);
         return 0;
 
 }
