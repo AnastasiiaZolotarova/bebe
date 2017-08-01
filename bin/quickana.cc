@@ -15,7 +15,8 @@
 #include "TProfile.h"
 #include "TTree.h"
 #include "TVirtualFFT.h"
-
+#include "TComplex.h"
+#include "TRandom.h"
 #define TIME_WINDOW 2048
 
 typedef struct {
@@ -109,6 +110,10 @@ int main()
         TGraph * g_ampl_vs_decay_light = new TGraph();
         g_ampl_vs_decay_light->SetNameTitle("g_ampl_vs_decay_light", "g_ampl_vs_decay_light");
         gDirectory->Add(g_ampl_vs_decay_light);
+   
+        TGraph * g_noise            = new TGraph();
+        g_noise->SetNameTitle("g_noise", "g_noise");
+        gDirectory->Add(g_noise);
 
         /* TGraph * g_ampl_all_vs_t        = new TGraph();
         g_ampl_all_vs_t->SetNameTitle("g_ampl_all_vs_t", "g_ampl_all_vs_t");
@@ -127,31 +132,37 @@ int main()
         FILE * fp = fopen("pulses.dat", "w+");
         FILE * f_t = fopen("pulse_sample.dat", "r");
         FILE * fn = fopen("noise.dat", "w+");
+        FILE * f_ham = fopen("hamming.dat", "r");
         size_t ipulse = 0, totpulse = 1, i=0, k=1;
         std::ofstream ofs;
         ofs.open ("pappa.dat", std::ofstream::out);
         float model[TIME_WINDOW];
         float number;
         size_t ind_mean=0, count=0, is=0; Int_t size=2048;
-
+         TComplex c_noise[size]=0, c_noise_temp[size]=0; Double_t  ham[size]={0};
         TVirtualFFT *fft_noise = TVirtualFFT::FFT(1, &size, "R2C K");
-                Double_t for_ttf[size];
+                Double_t for_ttf[size]={0};
    		Double_t *re_noise = new Double_t[size];
                 Double_t *im_noise = new Double_t[size];
                 Double_t *re_noise_temp = new Double_t[size];
                 Double_t *im_noise_temp = new Double_t[size];
-                for (size_t is =0; is < size; ++is)
+               for (size_t is =0; is < size; ++is)
                  {re_noise[is]=0;
                   im_noise[is]=0;
                   re_noise_temp[is]=0;
                   im_noise_temp[is]=0; 
-		for_ttf[is]=0;}
+		  }
                  while( fscanf(f_t, "%f \n", &number) > 0 ) // parse %d followed by ','
                 {
                 model[i]= number; // instead of sum you could put your numbers in an array
                 i++;
                 }
                 fclose(f_t);
+                 i=0;number=0;
+                while( fscanf(f_ham, "%f \n", &number) > 0 ) 
+               {    
+                ham[i]=number; 
+                i++;} TRandom *r0= new TRandom();
         for (Long64_t ien = 0; ien < nentries; ++ien)
                 {
 
@@ -176,40 +187,39 @@ int main()
 
                //=======================COLLECTING NOISE FROM PEDESTALS
 		p.pre_process(500);
+                 float ped_rms = p.rms(0, 500);
                  float * data = p.data();
                 
-                  
+                  double x;
                  auto res = p.maximum(0, 512);
                 size_t iM = res.first;                        // index of the max_ampl from the beginning of the window
                 M = res.second;  
                 float Min=p.minimum(0,512);
                // size_t is;                 
-                if(count<1000 && ien % 2 == 0 && M<20 && Min>-20){
+                if(count<1000 && ien % 2 == 0 && M<22 && Min>-22 && ped_rms<8){
                    
                 if (k>4){k=1;} //if (count<20){ std::cerr << "noise value at 256 "<< k << " "<< 1+size*(k-1)/4 <<"\n";}
                 for(is=(1+size*(k-1)/4); is<=(size*k/4); ++is)
                  { 
 
                  //if (count<20){ for (size_t i=0; i<1; ++i) {std::cerr << "is value  "<< is <<"\n";}}
-
+                  x=r0->Gaus(0,4);
                   for_ttf[is]=data[is-512*(k-1)];
                 //  im_noise[is]+=im_noise_temp[is-512*(k-1)];                
                  }
-		++count;
+		//++count;
                  ++k;
   
-              if (k>=4){
+              if (k>=4){++count;
                 fft_noise->SetPoints(for_ttf);
    		fft_noise->Transform();
                 fft_noise->GetPointsComplex(re_noise_temp,im_noise_temp);
-        
+               for (size_t s = 0; s < size/2; ++s) { c_noise_temp[s] = TComplex(re_noise_temp[s], im_noise_temp[s]); }
                    for (size_t is =0; is < size; ++is)
                  {  p_average_noise->Fill(is, for_ttf[is]);
-                             }
-                for (size_t is =0; is < size; ++is)
-                 {
-                  re_noise_temp[i]=+re_noise_temp[i];
-                  im_noise_temp[i]=+im_noise_temp[i];
+                    c_noise[is]=+(TComplex::Abs(c_noise_temp[is])*TComplex::Abs(c_noise_temp[is]));
+               //   re_noise_temp[i]=+re_noise_temp[i];
+                 // im_noise_temp[i]=+im_noise_temp[i];
                }}
 		
 }
@@ -221,7 +231,7 @@ int main()
                 h_ped_raw->Fill(ped_raw);
                 p.pre_process(500);
                 float ped = p.average(0, 100); // simple average
-                float ped_rms = p.rms(0, 100);
+                //float ped_rms = p.rms(0, 100);
                 h_ped->Fill(ped);
                 h_ped_rms->Fill(ped_rms);
                 res = p.maximum(100, p.n_samples());
@@ -394,7 +404,7 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
 //--------------------COMMENTED: write to file the pulse after fillter
 
        //  detailed check of pulses if conditions applies: after filtering
-                if( ipulse<7 && SI<1.4 && SI>1.36 && fM>10200 && fM<10700 && trise>32 && trise<33){
+                if( ipulse<7 && SI<1.4 && SI>1.36 && fM>2000 && fM<10700 && trise>20 && trise<40){
                         p.filter(p.n_samples(),iM,M);              //wiener filter
                         ofs << "# pulse number:" << ipulse << "\n";
                         p.inspect(ofs);
@@ -440,19 +450,20 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
           for (size_t o = 0; o < TIME_WINDOW; ++o)
                 {
          model1=p_average_signal->GetBinContent(o);
-        fprintf(fp,"%f \n", model1); }
-        // re_noise[o]=re_noise[o]/count;
-         //im_noise[o]=im_noise[o]/count;}
+        fprintf(fp,"%f \n", model1); 
+         re_noise[o]=c_noise[o].Re()/sqrt(o);
+         im_noise[o]=c_noise[o].Im();}
 
           TVirtualFFT *fft_back = TVirtualFFT::FFT(1, &size, "C2R K");
-               fft_back->SetPointsComplex(re_noise_temp,im_noise_temp);
+               fft_back->SetPointsComplex(re_noise,im_noise);
                fft_back->Transform();
                fft_back->GetPoints(data_fft); 
           for (size_t o = 0; o < size; ++o)
                 {
-         model1=data_fft[o]/count;
-        fprintf(fn,"%f \n", model1); }
-
+         model1=data_fft[o]/size/count;
+        fprintf(fn,"%f \n", re_noise[o]/count); }
+for (size_t p=1; p<1024; ++p)
+ g_noise->SetPoint(p, log10(p), log10(c_noise[p].Re()/sqrt(p)));
           std::cerr << "totpulse "<< totpulse <<"\n";
 
         ofs.close();
