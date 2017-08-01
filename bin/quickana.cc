@@ -196,7 +196,7 @@ int main()
                 M = res.second;  
                 float Min=p.minimum(0,512);
                // size_t is;                 
-                if(count<1000 && ien % 2 == 0 && M<22 && Min>-22 && ped_rms<8){
+                if(count<2000 && ien % 2 == 0 && M<22 && Min>-22 && ped_rms<8){
                    
                 if (k>4){k=1;} //if (count<20){ std::cerr << "noise value at 256 "<< k << " "<< 1+size*(k-1)/4 <<"\n";}
                 for(is=(1+size*(k-1)/4); is<=(size*k/4); ++is)
@@ -204,7 +204,7 @@ int main()
 
                  //if (count<20){ for (size_t i=0; i<1; ++i) {std::cerr << "is value  "<< is <<"\n";}}
                   x=r0->Gaus(0,4);
-                  for_ttf[is]=data[is-512*(k-1)];
+                  for_ttf[is]=data[is-512*(k-1)]*ham[is];
                 //  im_noise[is]+=im_noise_temp[is-512*(k-1)];                
                  }
 		//++count;
@@ -450,8 +450,9 @@ g_ampl_vs_rise->SetPoint(gcnt++, fM, trise);}
           for (size_t o = 0; o < TIME_WINDOW; ++o)
                 {
          model1=p_average_signal->GetBinContent(o);
-        fprintf(fp,"%f \n", model1); 
-         re_noise[o]=c_noise[o].Re()/sqrt(o);
+        fprintf(fp,"%f \n", model1);
+         c_noise[o]=c_noise[o];
+         re_noise[o]=c_noise[o].Re();
          im_noise[o]=c_noise[o].Im();}
 
           TVirtualFFT *fft_back = TVirtualFFT::FFT(1, &size, "C2R K");
