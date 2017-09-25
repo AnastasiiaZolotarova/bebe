@@ -160,7 +160,7 @@ void bb::pulse::filter(size_t size, size_t iM, real_t M)
               //   std::cerr << "k re value  "<< k <<"\n";
                   for (i=0; i<size/2; ++i)
                 {
-                transfer_func[i]=k*(((TComplex::Conjugate(c_model_win[i]))/(noise[i]))*exp(-TComplex::I()*2*(TMath::Pi())*iM*i));
+                transfer_func[i]=k*(((TComplex::Conjugate(c_model_win[i]))/(noise[i]))*TComplex::Exp(-TComplex::I()*2*(TMath::Pi())*iM*i));
                // transfer_func[i]=c_wiener[i];
                //    std::cerr << "transf func re value  "<<transfer_func[i] <<"\n";
                  }                
